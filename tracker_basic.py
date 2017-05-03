@@ -19,7 +19,7 @@ n_classes = 4
 batch_size = 100 # how many samples you load at a time for training
 
 # height x width
-xdim = dataset.testing_cache[0].shape[0]
+xdim = dataset.testing_img[0].shape[0]
 x = tf.placeholder('float', [None, xdim]) # image is flattened 34 x 50
 y = tf.placeholder('float')
 
@@ -107,6 +107,6 @@ def train_neural_network(x, y):
                 _, c = s.run([optimizer, cost], feed_dict={x: epoch_x, y: epoch_y})
                 epoch_loss += c
             print 'Epoch: ', epoch, ' completed out of ', hm_epochs, ' loss: ', epoch_loss
-            print 'Accuracy: ', accuracy.eval({x: dataset.testing_cache, y: dataset.testing_label})
+            print 'Accuracy: ', accuracy.eval({x: dataset.testing_img, y: dataset.testing_label})
 
 train_neural_network(x, y)
