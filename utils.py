@@ -55,9 +55,6 @@ class Dataset(object):
     testing_cache = []
     testing_label = []
 
-    iterator = 0
-
-
     def cache_data(self):
         print 'Cacheing to %s' % self.cache_dir
         if not os.path.isdir(self.cache_dir):
@@ -137,13 +134,20 @@ class Dataset(object):
         self.cache_data()
 
 
-    def next_batch(self, batch_size):
-        img = self.training_cache[self.iterator: self.iterator + batch_size]
-        label = self.training_label[self.iterator: self.iterator + batch_size]
+    def training_batches(self, batch_size, count):
+        i = 0
+        l = len(self.training_cache)
+        for _ in range(count):
+            img = self.training_cache[i: i + batch_size]
+            label = self.training_label[i: i + batch_size]
+            if i + batch_size > l:
+                img = np.concatenate([img, self.training_cache[0: (i + batch_size - l)]])
+                label = np.concatenate([label, self.training_label[0: (i + batch_size - l)]])
+                i = i + batch_size - l
+            else:
+                i += batch_size
 
-        self.iterator += batch_size
-        return (img, label)
-
+            yield (img, label)
 
 if __name__=='__main__':
     a = Dataset()
