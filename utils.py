@@ -91,6 +91,7 @@ class Dataset(object):
             print _
             dir = None
             target_cache = None
+            target_lable = None
 
             if _ == 'training':
                 target_cache = self.training_img
@@ -113,18 +114,21 @@ class Dataset(object):
                         img = img.reshape(200, 300)
                         img_reduce = block_reduce(img, block_size=(6, 6), func=np.mean)
                         img_reduce = img_reduce.flatten()
+
                         target_cache.append(img_reduce)
 
                         if pos == 'top_left':
-                            target_lable.append(np.asarray([1.0, 0.0, 0.0, 0.0]))
+                            one_hot = [1.0, 0.0, 0.0, 0.0]
                         elif pos == 'top_right':
-                            target_lable.append(np.asarray([0.0, 1.0, 0.0, 0.0]))
+                            one_hot = [0.0, 1.0, 0.0, 0.0]
                         elif pos == 'bot_left':
-                            target_lable.append(np.asarray([0.0, 0.0, 1.0, 0.0]))
+                            one_hot = [0.0, 0.0, 1.0, 0.0]
                         elif pos == 'bot_right':
-                            target_lable.append(np.asarray([0.0, 0.0, 0.0, 1.0]))
+                            one_hot = [0.0, 0.0, 0.0, 1.0]
                         else:
                             assert False, 'WTF IS THIS POS? %s' % pos
+
+                        target_lable.append(np.asarray(one_hot))
 
         self.training_img = np.array(self.training_img)
         self.training_label = np.array(self.training_label)
@@ -148,6 +152,7 @@ class Dataset(object):
                 i += batch_size
 
             yield (img, label)
+
 
 if __name__=='__main__':
     a = Dataset()
