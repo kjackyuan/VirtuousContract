@@ -3,7 +3,7 @@ from utils import Dataset
 
 # handwriting number recognition
 
-dataset = Dataset('data')
+dataset = Dataset('./data')
 
 n_classes = 4
 batch_size = 100 # how many samples you load at a time for training
@@ -45,8 +45,6 @@ def train_neural_network(x, y):
         s.run(tf.global_variables_initializer())
 
         for epoch in range(hm_epochs):
-            print 'starting: %s' % epoch
-
             epoch_loss = 0
             for epoch_x, epoch_y in dataset.training_batches(batch_size, 10):
                 _, c, acc = s.run([optimizer, cost, accuracy], feed_dict={x: epoch_x, y: epoch_y})
