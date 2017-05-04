@@ -31,3 +31,5 @@ tags
 # Eclipse files
 .project
 .pydevproject
+
+cache

@@ -3,10 +3,10 @@ import csv
 import pickle
 import gzip
 import numpy as np
+import tensorflow as tf
 from itertools import imap
 import scipy.misc as smp
 from skimage.measure import block_reduce
-
 
 def show_img_2D(img, max_row, max_col):
     data = np.zeros((max_row, max_col, 3), dtype=np.uint8)
@@ -22,7 +22,6 @@ def show_img_2D(img, max_row, max_col):
     img = smp.toimage(data)  # Create a PIL image
     img.show()  # View in default viewer
 
-
 def show_img_1D(img, max_row, max_col):
     img_data = np.zeros((max_row, max_col, 3), dtype=np.uint8)
     row = 0
@@ -37,17 +36,14 @@ def show_img_1D(img, max_row, max_col):
     img = smp.toimage(img_data)  # Create a PIL image
     img.show()  # View in default viewer
 
-
 def load_img_to_nparray(filepath):
     with open(filepath, 'r') as f:
         reader = csv.reader(f)
         data = reader.next()
     return np.asarray(list(imap(float, data)))
 
-
 class Dataset(object):
     position = ['top_left', 'top_right', 'bot_left', 'bot_right']
-    cache_dir = 'dataset_cache'
 
     training_img = []
     training_label = []
@@ -55,88 +51,71 @@ class Dataset(object):
     testing_img = []
     testing_label = []
 
-    def cache_data(self):
-        print 'Cacheing to %s' % self.cache_dir
-        if not os.path.isdir(self.cache_dir):
-            os.mkdir(self.cache_dir)
+    def __init__(self, path, cache_path = 'cache'):
+        if os.path.isdir(cache_path):
+            imgs, labels = self._load_cache(cache_path)
+        else:
+            imgs, labels = self._load_data(path)
+            self._dump_cache(cache_path, imgs=imgs, labels=labels)
 
-        with gzip.GzipFile(os.path.join(self.cache_dir, 'training_cache'), 'w') as zipf:
-            pickle.dump(self.training_img, zipf)
-        with gzip.GzipFile(os.path.join(self.cache_dir, 'training_label'), 'w') as zipf:
-            pickle.dump(self.training_label, zipf)
-        with gzip.GzipFile(os.path.join(self.cache_dir, 'testing_cache'), 'w') as zipf:
-            pickle.dump(self.testing_img, zipf)
-        with gzip.GzipFile(os.path.join(self.cache_dir, 'testing_label'), 'w') as zipf:
-            pickle.dump(self.testing_label, zipf)
+        l = len(imgs)
+        self.training_img = imgs[range(0, l, 2)]
+        self.training_label = labels[range(0, l, 2)]
+        self.testing_img = imgs[range(1, l, 2)]
+        self.testing_label = labels[range(1, l, 2)]
 
+    def _dump_cache(self, path, imgs, labels):
+        print 'Caching to %s' % path
+        if not os.path.isdir(path):
+            os.mkdir(path)
 
-    def load_cache(self):
-        print 'Loading cache from %s' % self.cache_dir
-        with gzip.open(os.path.join(self.cache_dir, 'training_cache'), 'rb') as zipf:
-            self.training_img = pickle.load(zipf)
-        with gzip.open(os.path.join(self.cache_dir, 'training_label'), 'rb') as zipf:
-            self.training_label = pickle.load(zipf)
-        with gzip.open(os.path.join(self.cache_dir, 'testing_cache'), 'rb') as zipf:
-            self.testing_img = pickle.load(zipf)
-        with gzip.open(os.path.join(self.cache_dir, 'testing_label'), 'rb') as zipf:
-            self.testing_label = pickle.load(zipf)
+        with gzip.GzipFile(os.path.join(path, 'images'), 'w') as zipf:
+            pickle.dump(imgs, zipf)
+        with gzip.GzipFile(os.path.join(path, 'labels'), 'w') as zipf:
+            pickle.dump(labels, zipf)
 
+    def _load_cache(self, path):
+        print 'Loading cache from %s' % path
+        with gzip.open(os.path.join(path, 'images'), 'rb') as zipf:
+            imgs = pickle.load(zipf)
+        with gzip.open(os.path.join(path, 'labels'), 'rb') as zipf:
+            labels = pickle.load(zipf)
+        return imgs, labels
 
-    def prep_data(self):
-        if os.path.isdir(self.cache_dir):
-            self.load_cache()
-            return
+    def _load_data(self, path):
+        print 'Loading original data from %s' % path
+        imgs = []
+        labels = []
+        for pos in self.position:
+            for root, dirs, files in os.walk('%s/%s' % (path, pos), topdown=False):
+                for name in files:
+                    filepath = os.path.join(root, name)
+                    if not filepath.endswith('.csv'):
+                        continue
+                    img = load_img_to_nparray(filepath)
 
-        for _ in ['training', 'testing']:
-            print _
-            dir = None
-            target_cache = None
-            target_lable = None
+                    img = img.reshape(200, 300)
+                    img_reduce = block_reduce(img, block_size=(6, 6), func=np.mean)
+                    img_reduce = img_reduce.flatten()
 
-            if _ == 'training':
-                target_cache = self.training_img
-                target_lable = self.training_label
-                dir = 'training_data'
-            elif _ == 'testing':
-                target_cache = self.testing_img
-                target_lable = self.testing_label
-                dir = 'testing_data'
+                    imgs.append(img_reduce)
 
-            for pos in self.position:
-                print pos
-                for root, dirs, files in os.walk('%s/%s' % (dir, pos), topdown=False):
-                    for name in files:
-                        filepath = os.path.join(root, name)
-                        if not filepath.endswith('.csv'):
-                            continue
-                        img = load_img_to_nparray(filepath)
+                    if pos == 'top_left':
+                        one_hot = [1.0, 0.0, 0.0, 0.0]
+                    elif pos == 'top_right':
+                        one_hot = [0.0, 1.0, 0.0, 0.0]
+                    elif pos == 'bot_left':
+                        one_hot = [0.0, 0.0, 1.0, 0.0]
+                    elif pos == 'bot_right':
+                        one_hot = [0.0, 0.0, 0.0, 1.0]
+                    else:
+                        assert False, 'WTF IS THIS POS? %s' % pos
 
-                        img = img.reshape(200, 300)
-                        img_reduce = block_reduce(img, block_size=(6, 6), func=np.mean)
-                        img_reduce = img_reduce.flatten()
+                    labels.append(np.asarray(one_hot))
 
-                        target_cache.append(img_reduce)
-
-                        if pos == 'top_left':
-                            one_hot = [1.0, 0.0, 0.0, 0.0]
-                        elif pos == 'top_right':
-                            one_hot = [0.0, 1.0, 0.0, 0.0]
-                        elif pos == 'bot_left':
-                            one_hot = [0.0, 0.0, 1.0, 0.0]
-                        elif pos == 'bot_right':
-                            one_hot = [0.0, 0.0, 0.0, 1.0]
-                        else:
-                            assert False, 'WTF IS THIS POS? %s' % pos
-
-                        target_lable.append(np.asarray(one_hot))
-
-        self.training_img = np.array(self.training_img)
-        self.training_label = np.array(self.training_label)
-        self.testing_img = np.array(self.testing_img)
-        self.testing_label = np.array(self.testing_label)
-
-        self.cache_data()
-
+        imgs = np.array(imgs)
+        labels = np.array(labels)
+        return imgs, labels
 
     def training_batches(self, batch_size, count):
         i = 0
@@ -144,18 +123,11 @@ class Dataset(object):
         for _ in range(count):
             img = self.training_img[i: i + batch_size]
             label = self.training_label[i: i + batch_size]
-            if i + batch_size > l:
-                img = np.concatenate([img, self.training_img[0: (i + batch_size - l)]])
-                label = np.concatenate([label, self.training_label[0: (i + batch_size - l)]])
-                i = i + batch_size - l
-            else:
-                i += batch_size
+            i += batch_size
+            if i > l:
+                img = np.concatenate([img, self.training_img[0:(i - l)]])
+                label = np.concatenate([label, self.training_label[0:(i - l)]])
+                i -= l
 
             yield (img, label)
 
-
-if __name__=='__main__':
-    a = Dataset()
-    a.prep_data()
-    print a.testing_label[123]
-    show_img_1D(a.testing_img[123], 34, 50)
