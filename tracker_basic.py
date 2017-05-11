@@ -1,8 +1,6 @@
 import tensorflow as tf
 from utils import Dataset
 
-# handwriting number recognition
-
 dataset = Dataset('./data')
 
 n_classes = 4
@@ -50,5 +48,6 @@ def train_neural_network(x, y):
                 _, c, acc = s.run([optimizer, cost, accuracy], feed_dict={x: epoch_x, y: epoch_y})
                 epoch_loss += c
             print 'Epoch', epoch, ', accuracy:', acc, ', loss:', epoch_loss
+            print 'Accuracy: ', accuracy.eval({x: dataset.testing_img, y: dataset.testing_label})
 
 train_neural_network(x, y)

@@ -1,48 +1,43 @@
+import numpy as np
 import tflearn
-from tflearn.layers.conv import conv_2d, max_pool_2d
-from tflearn.layers.core import input_data, dropout, fully_connected
+from tflearn.layers.core import input_data, fully_connected
 from tflearn.layers.estimator import regression
 from utils import Dataset
 
-dataset = Dataset('data')
-
-X = dataset.training_img
-Y = dataset.training_label
-test_x = dataset.testing_img
-test_y = dataset.testing_label
+dataset = Dataset('./data')
 
 row = 34
 col = 50
 n_classes = 4
+n_epoch = 200
+learning_rate = 0.0001
 
-n_epoch = 10
+X = []
+Y = []
 
-X = X.reshape([-1, row, col, 1])
-test_x = test_x.reshape([-1, row, col, 1])
+for epoch_x, epoch_y in dataset.training_batches(100, 10):
+    X += list(epoch_x)
+    Y += list(epoch_y)
 
-convnet = input_data(shape=[None, row, col, 1], name='input')
+X = np.array(X)
+Y = np.array(Y)
 
-convnet = conv_2d(convnet, 32, 2, activation='sigmoid')
-convnet = max_pool_2d(convnet, 2) # mostly just to reduce complutation cost, removing did help accuracy
+test_x = dataset.testing_img
+test_y = dataset.testing_label
 
-convnet = conv_2d(convnet, 32, 2, activation='sigmoid')
-convnet = max_pool_2d(convnet, 2)
 
-convnet = conv_2d(convnet, 64, 2, activation='sigmoid')
-convnet = max_pool_2d(convnet, 2)
+fnn = input_data(shape=[None, row * col], name='input')
 
-convnet = fully_connected(convnet, 1024, activation='sigmoid')
-#convnet = dropout(convnet, 0.8) # helps against overfitting, not needed at the moment
+fnn = fully_connected(fnn, 500, activation='sigmoid')
+fnn = fully_connected(fnn, 500, activation='sigmoid')
+fnn = fully_connected(fnn, 500, activation='sigmoid')
+fnn = fully_connected(fnn, 500, activation='sigmoid')
 
-convnet = fully_connected(convnet, n_classes, activation='softmax')
+fnn = fully_connected(fnn, n_classes, activation='sigmoid')
 
-convnet = regression(convnet,
-                     optimizer='adam',
-                     learning_rate=0.01,
-                     loss='categorical_crossentropy', # also tried mean_square but no improvements
-                     name='targets')
+fnn = regression(fnn, learning_rate=learning_rate, name='targets')
 
-model = tflearn.DNN(convnet)
+model = tflearn.DNN(fnn)
 
 model.fit({'input': X},
           {'targets': Y},
@@ -52,5 +47,5 @@ model.fit({'input': X},
           show_metric=True,
           run_id='2B')
 
-model.save('tflearn_cnn.model')
+model.save('touch_screen.model')
 
