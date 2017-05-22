@@ -1,11 +1,15 @@
 import os
+import cv2
 import csv
 import pickle
 import gzip
+import pygame
 import numpy as np
-from itertools import imap
 import scipy.misc as smp
+
+from itertools import imap
 from skimage.measure import block_reduce
+
 
 def show_img(img, max_row, max_col):
     data = np.zeros((max_row, max_col, 3), dtype=np.uint8)
@@ -25,19 +29,23 @@ def show_img(img, max_row, max_col):
     img = smp.toimage(data)  # Create a PIL image
     img.show()  # View in default viewer
 
+
 def save(path, obj):
     with gzip.GzipFile(path, 'w') as zipf:
         pickle.dump(obj, zipf)
- 
+
+
 def load(path):
     with gzip.open(path, 'rb') as zipf:
         return pickle.load(zipf)
+
 
 def load_img_to_nparray(filepath):
     with open(filepath, 'r') as f:
         reader = csv.reader(f)
         data = reader.next()
     return np.asarray(list(imap(float, data)))
+
 
 class Dataset(object):
 
@@ -104,3 +112,102 @@ class Dataset(object):
                 i -= l
 
             yield (img, label)
+
+
+def test_accuracy(model, testing_img, testing_label, row, col):
+
+    total_img = len(testing_img)
+    correct_img = 0
+    intermediate_total = 0
+
+    filter = lambda x: 0 if x < 1.0 else 1.0
+    filter = np.vectorize(filter)
+
+    for id, img in enumerate(testing_img):
+        if not id % 500:
+            print '********************************************'
+            print '%s/%s' % (id, total_img)
+            print 'correct:%s, wrong:%s, total:%s, percentage:%s' % \
+                  (correct_img, intermediate_total - correct_img,
+                   intermediate_total, (correct_img / float(intermediate_total+1e-6)))
+            print '***********'
+
+        label = testing_label[id]
+        predict_label = np.array(model.predict(img.reshape([-1, row*col]))[0])
+
+        max_pos = -1
+        for pos, i in enumerate(label):
+            if i == 1.0:
+                max_pos = pos
+        assert max_pos > -1
+
+        max_value = predict_label[max_pos]
+
+        predict_label = predict_label/max_value
+        correct_prediction = all(label == filter(predict_label))
+
+        if correct_prediction:
+            correct_img += 1
+
+        intermediate_total += 1
+
+    print 'Final:'
+    print 'correct:%s, wrong:%s, total:%s, percentage:%s' % \
+          (correct_img, total_img-correct_img, total_img, (correct_img/float(total_img)))
+
+
+def draw_heatmap(model, num_square, num_img_per_square, img_data_dir):
+    board_size = 400
+    full_row = 200
+    full_col = 300
+    row = 34
+    col = 50
+
+    normalize = lambda x: x / 255.0
+    normalize = np.vectorize(normalize)
+
+    pygame.init()
+    screen = pygame.display.set_mode((board_size, board_size))
+    done = False
+
+    for pos in range(0, num_square):
+        for img_id in range(0, num_img_per_square):
+            filepath = os.path.join(img_data_dir, '%s/%s.png' % (pos, img_id))
+            img = cv2.imread(filepath)
+            if img is None:
+                continue
+
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            cv2.imshow('img_gray', img)
+
+            img = img.reshape(full_row * full_col)
+            img = normalize(img)
+
+            img = img.reshape(full_row, full_col)
+            img = block_reduce(img, block_size=(6, 6), func=np.mean)
+            img = img.flatten()
+
+            predict_label = np.array(model.predict(img.reshape([-1, row * col]))[0])
+
+            max_pos = np.argmax(predict_label)
+            max_value = predict_label[max_pos]
+            predict_label = predict_label / max_value
+            print 'Predicted position %s' % max_pos
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    done = True
+
+            width = int(board_size/np.sqrt(num_square))
+            square_width = int(np.sqrt(num_square))
+
+            predict_label = np.resize(predict_label, (square_width, square_width))
+            for i, label_row in enumerate(predict_label):
+                for j, val in enumerate(label_row):
+                    pygame.draw.rect(screen,
+                                     (255 * val, 0, 255 * (1.0 - val)),
+                                     pygame.Rect(width * j, width * i, width * (j + 1),
+                                                 width * (i + 1)))
+
+            k = cv2.waitKey(30)
+            pygame.display.flip()

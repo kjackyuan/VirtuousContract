@@ -3,15 +3,14 @@ import numpy as np
 import tflearn
 from tflearn.layers.core import input_data, fully_connected
 from tflearn.layers.estimator import regression
-from utils import Dataset
-
-
+from utils import Dataset, test_accuracy, draw_heatmap
 
 num_square = 16
 model_dir = 'tensorflow_models'
-model_name = os.path.join(model_dir, '2B_%s.model'%num_square)
+img_data_dir = 'image_data'
 
-dataset = Dataset('./image_data/data_16', num_square)
+model_name = os.path.join(model_dir, '2B_%s.model' % num_square)
+dataset = Dataset(os.path.join(img_data_dir, 'data_%s' % num_square), num_square)
 
 row = 34
 col = 50
@@ -46,95 +45,17 @@ fnn = regression(fnn, learning_rate=learning_rate, name='targets')
 
 model = tflearn.DNN(fnn)
 
-model.fit({'input': X},
-          {'targets': Y},
-          n_epoch=n_epoch,
-          validation_set=({'input': test_x}, {'targets': test_y}),
-          snapshot_step=500,
-          show_metric=True,
-          run_id='2B')
-
-model.save(model_name)
-
+# model.fit({'input': X},
+#           {'targets': Y},
+#           n_epoch=n_epoch,
+#           validation_set=({'input': test_x}, {'targets': test_y}),
+#           snapshot_step=500,
+#           show_metric=True,
+#           run_id='2B')
+#
+# model.save(model_name)
 
 model.load(model_name)
+#test_accuracy(model, dataset.testing_img, dataset.testing_label, row, col)
+draw_heatmap(model, num_square, 502, os.path.join(img_data_dir, 'raw_img_%s' % num_square))
 
-# maxsize = len(dataset.training_img)
-# while True:
-    # id = int(raw_input("img id: "))
-    # if id >= maxsize:
-    #     print 'id out of scope'
-    #     continue
-    # result = model.predict(dataset.testing_img[id].reshape([-1, row*col]))
-    # print result
-    # print dataset.testing_label[id]
-
-total_img = len(dataset.testing_label)
-correct_img = 0
-
-filter = lambda x: 0 if x < 1.0 else 1.0
-filter = np.vectorize(filter)
-
-# for id, img in enumerate(dataset.testing_img):
-#     print '%s/%s' % (id, total_img)
-#
-#     label = dataset.testing_label[id]
-#     predict_label = np.array(model.predict(img.reshape([-1, row*col]))[0])
-#
-#     max_pos = -1
-#     for pos, i in enumerate(label):
-#         if i == 1.0:
-#             max_pos = pos
-#     assert max_pos > -1
-#
-#     max_value = predict_label[max_pos]
-#
-#     predict_label = predict_label/max_value
-#     correct_prediction = all(label == filter(predict_label))
-#
-#     if correct_prediction:
-#         correct_img += 1
-#
-# print 'correct:%s, wrong:%s, total:%s, percentage:%s' % \
-#       (correct_img, total_img-correct_img, total_img, (correct_img/float(total_img)))
-
-
-import pygame
-
-pygame.init()
-screen = pygame.display.set_mode((400, 400))
-clock = pygame.time.Clock()
-done = False
-
-for id, img in enumerate(dataset.testing_img):
-    print '%s/%s' % (id, total_img)
-
-    label = dataset.testing_label[id]
-    predict_label = np.array(model.predict(img.reshape([-1, row*col]))[0])
-
-    max_pos = -1
-    for pos, i in enumerate(label):
-        if i == 1.0:
-            max_pos = pos
-    assert max_pos > -1
-
-    max_value = predict_label[max_pos]
-
-    predict_label = predict_label/max_value
-
-    ########
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            done = True
-
-    width = 100
-    print predict_label
-    predict_label = np.resize(predict_label, (4,4))
-    for i, label_row in enumerate(predict_label):
-        for j, val in enumerate(label_row):
-            pygame.draw.rect(screen,
-                             (255*val, 0, 255*(1.0-val)),
-                             pygame.Rect(width*i, width*j, width*(i+1), width*(j+1)))
-
-    clock.tick(600)
-    pygame.display.flip()
