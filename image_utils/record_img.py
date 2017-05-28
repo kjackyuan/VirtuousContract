@@ -3,21 +3,29 @@ import time
 import os
 import numpy as np
 
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
-
 cap = cv2.VideoCapture(0)
 
-counter = 0
-record = False
+num_square = 16
+num_img = 1000
 
-num_img = 500
-root_dir = 'training_data_64_2'
-for pos in range(0, 64):
+root_dir = 'image_data'
+main_dir = 'realtime_raw_img_16'
+
+main_dir = os.path.join(root_dir, main_dir)
+
+if not os.path.isdir(main_dir):
+    os.mkdir(main_dir)
+
+
+for pos in range(0, num_square):
     counter = 0
     record = False
-    os.mkdir('%s/%s' % (root_dir, pos))
-    #print '********* %s ********' % pos
+
+    sub_dir = os.path.join(main_dir, str(pos))
+    if not os.path.isdir(sub_dir):
+        os.mkdir(sub_dir)
+
+    print 'Read to record Position: %s' % pos
 
     while True:
         ret, img = cap.read()
@@ -26,40 +34,30 @@ for pos in range(0, 64):
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        # faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-        #
-        # print faces
-        # for (x,y,w,h) in faces:
-        #     cv2.rectangle(img, (x,y), (x+w, y+h), (255,0,0), 2)
-        #     roi_gray = gray[y:y+h, x:x+w]
-        #     roi_color = img[y:y+h, x:x+w]
-        #     eyes = eye_cascade.detectMultiScale(roi_gray)
-        #     for (ex, ey, ew, eh) in eyes:
-        #         cv2.rectangle(roi_color, (ex, ey), (ex+ew, ey+eh), (0,255,0), 2)
-
-
         cv2.imshow('img', img)
+        cv2.imshow('gray', gray)
 
         if record:
-            if counter > num_img:
+            if counter/float(num_img) >= 0.75:
+                print '%s: 75%% Done' % pos
+            elif counter/float(num_img) >= 0.50:
+                print '%s: 50%% Done' % pos
+            elif counter / float(num_img) >= 0.25:
+                print '%s: 25%% Done' % pos
+
+            if counter >= num_img:
                 break
-            counter += 1
-            #result = []
-            # for i in gray:
-            #     for r in i:
-            #         result.append(r/255.0)
-            filename = '%s/%s/%s.png' % (root_dir, pos, counter)
+            filename = os.path.join(sub_dir, '%s.png' % counter)
             with open(filename, 'wb') as f:
                 cv2.imwrite(filename, gray)
-            # np.asarray(result).tofile(filename,sep=',',format='%10.10f')
+            counter += 1
 
-        k = cv2.waitKey(30)
+        k = cv2.waitKey(3)
         if k == ord('q'):
             record = True
+            print 'Recording.... Position: %s' % pos
             time.sleep(3)
         elif k & 0xff == 27:
             break
-
 
 cap.release()

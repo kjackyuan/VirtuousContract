@@ -27,6 +27,8 @@
 .tox
 run.sh
 tags
+image_data/
+tensorflow_models/
 
 # Eclipse files
 .project
