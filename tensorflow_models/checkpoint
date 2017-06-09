@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/devola/VirtuousContract/tensorflow_models/2B_16.model"
+all_model_checkpoint_paths: "/home/devola/VirtuousContract/tensorflow_models/2B_16.model"

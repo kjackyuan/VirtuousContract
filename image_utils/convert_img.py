@@ -2,6 +2,7 @@ import cv2
 import time
 import os
 import numpy as np
+from multiprocessing import Pool
 
 
 num_square = 16
@@ -20,13 +21,13 @@ if not os.path.isdir(main_data_dir):
 normalize = lambda x: x/255.0
 normalize = np.vectorize(normalize)
 
-for pos in range(0, num_square):
+def convert_this_square(pos):
 	sub_img_dir = os.path.join(main_img_dir, str(pos))
 	sub_data_dir = os.path.join(main_data_dir, str(pos))
 
 	if not os.path.isdir(sub_data_dir):
 		os.mkdir(sub_data_dir)
-	
+
 	print pos
 
 	for i in range(0, num_img):
@@ -38,3 +39,9 @@ for pos in range(0, num_square):
 		img = normalize(img)
 
 		img.tofile(data_filepath, sep=',', format='%10.10f')
+
+pool = Pool(processes=4)  # start 4 worker processes
+inputs = range(num_square)
+pool.map(convert_this_square, inputs)
+
+

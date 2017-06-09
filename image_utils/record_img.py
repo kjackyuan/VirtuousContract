@@ -13,8 +13,8 @@ main_dir = 'realtime_raw_img_16'
 
 main_dir = os.path.join(root_dir, main_dir)
 
-if not os.path.isdir(main_dir):
-    os.mkdir(main_dir)
+# if not os.path.isdir(main_dir):
+#     os.mkdir(main_dir)
 
 
 for pos in range(0, num_square):
@@ -22,8 +22,8 @@ for pos in range(0, num_square):
     record = False
 
     sub_dir = os.path.join(main_dir, str(pos))
-    if not os.path.isdir(sub_dir):
-        os.mkdir(sub_dir)
+    # if not os.path.isdir(sub_dir):
+    #     os.mkdir(sub_dir)
 
     print 'Read to record Position: %s' % pos
 

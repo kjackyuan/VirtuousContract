@@ -1,8 +1,11 @@
 import os
+from multiprocessing import Pool
+
 import cv2
 import csv
 import pickle
 import gzip
+import functools
 import pygame
 import time
 import numpy as np
@@ -52,6 +55,36 @@ def load_img_to_nparray(filepath):
     return np.asarray(list(imap(float, data)))
 
 
+def _load_data(args):
+    pos, path, block_size, row, col, num_square = args
+    print pos
+
+    imgs = []
+    labels = []
+    for root, dirs, files in os.walk('%s/%s' % (path, pos), topdown=False):
+        for name in files:
+            filepath = os.path.join(root, name)
+
+            if name.endswith('.csv'):
+                img = load_img_to_nparray(filepath)
+                img = img.reshape(row, col)
+            elif name.endswith('.png'):
+                img = cv2.imread(filepath, 0)
+            else:
+                continue
+
+            img = block_reduce(img, block_size=(block_size, block_size), func=np.mean)
+
+            img = img.flatten()
+
+            label = np.zeros(num_square)
+            label[pos] = 1.0
+
+            imgs.append(img)
+            labels.append(label)
+    return imgs, labels
+
+
 class Dataset(object):
     def __init__(self, path, num_square, row=200, col=300, block_size=6, cache_path=None):
         self.num_square = num_square
@@ -77,30 +110,17 @@ class Dataset(object):
     def _load_data(self, path, block_size):
         imgs = []
         labels = []
-        for pos in range(0, self.num_square):
-            print pos
-            for root, dirs, files in os.walk('%s/%s' % (path, pos), topdown=False):
-                for name in files:
-                    filepath = os.path.join(root, name)
 
-                    if name.endswith('.csv'):
-                        img = load_img_to_nparray(filepath)
-                        img = img.reshape(self.row, self.col)
-                    elif name.endswith('.png'):
-                        img = cv2.imread(filepath, 0)
-                    else:
-                        continue
+        pool = Pool(processes=4)  # start 4 worker processes
+        inputs = []
+        for pos in range(self.num_square):
+            inputs.append((pos, path, block_size, self.row, self.col, self.num_square))
 
-                    img = block_reduce(img, block_size=(block_size, block_size), func=np.mean)
+        results = pool.map(_load_data, inputs)
 
-                    img = img.flatten()
-
-                    label = np.zeros(self.num_square)
-                    label[pos] = 1.0
-
-                    imgs.append(img)
-                    labels.append(label)
-
+        imgs, labels = zip(*results)
+        imgs = functools.reduce(lambda a,b: a+b, imgs)
+        labels = functools.reduce(lambda a,b: a+b, labels)
         imgs = np.array(imgs)
         labels = np.array(labels)
         return imgs, labels
@@ -130,7 +150,7 @@ def sobel_img(img):
     return edges
 
 
-def test_accuracy(model, testing_img, testing_label, row, col):
+def test_accuracy(model, testing_img, testing_label, row, col, flatten=True):
 
     total_img = len(testing_img)
     correct_img = 0
@@ -149,7 +169,12 @@ def test_accuracy(model, testing_img, testing_label, row, col):
             print '***********'
 
         label = testing_label[id]
-        predict_label = np.array(model.predict(img.reshape([-1, row*col]))[0])
+        if flatten:
+            img = img.reshape([-1, row*col])
+        else:
+            img = img.reshape([-1, row, col, 1])
+
+        predict_label = np.array(model.predict(img)[0])
 
         max_pos = -1
         for pos, i in enumerate(label):
