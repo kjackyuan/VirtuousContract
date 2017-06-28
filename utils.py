@@ -92,7 +92,7 @@ class Dataset(object):
         self.col = col
 
         if not cache_path:
-            cache_path = path + '_cache'
+            cache_path = path + '_cache_%s' % num_square
         if os.path.isfile(cache_path):
             print 'Loading cache from %s' % cache_path
             imgs, labels = load(cache_path)
@@ -224,10 +224,6 @@ def draw_heatmap_with_test_data(model, num_square, num_img_per_square, img_data_
             if not quiet:
                 cv2.imshow('img_gray', img)
 
-            # Sobel
-            # img = sobel_img(img)
-            # cv2.imshow('sobel', img)
-
             img = img.reshape(full_row * full_col)
             img = normalize(img)
             img = img.reshape(full_row, full_col)
@@ -269,6 +265,13 @@ def draw_heatmap_with_test_data(model, num_square, num_img_per_square, img_data_
             k = cv2.waitKey(3)
 
 
+MinH = 0
+MaxH = 74
+MinS = 69
+MaxS = 255
+MinV = 0
+MaxV = 255
+ksize = 13
 def draw_heatmap_with_realtime(model, num_square, row, col, block_size):
     board_size = 400
     full_row = 200
@@ -286,8 +289,14 @@ def draw_heatmap_with_realtime(model, num_square, row, col, block_size):
     while True:
         ret, img = cap.read()
         img = cv2.resize(img, (300, 200))
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        cv2.imshow('img_gray', img)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        hsv_filter = cv2.inRange(hsv, (MinH, MinS, MinV), (MaxH, MaxS, MaxV))
+        hsv_filter = cv2.dilate(hsv_filter, (5,5), iterations=5)
+        hsv_filter = cv2.medianBlur(hsv_filter, ksize)
+
+        cv2.imshow('img', img)
+        cv2.imshow('hsv', hsv)
+        cv2.imshow('hsv_filter', hsv_filter)
 
         k = cv2.waitKey(30)
         if k == ord('q'):
@@ -297,21 +306,26 @@ def draw_heatmap_with_realtime(model, num_square, row, col, block_size):
     while True:
         ret, img = cap.read()
         img = cv2.resize(img, (300, 200))
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        cv2.imshow('img_gray', img)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        hsv_filter = cv2.inRange(hsv, (MinH, MinS, MinV), (MaxH, MaxS, MaxV))
+        hsv_filter = cv2.dilate(hsv_filter, (5, 5), iterations=5)
+        hsv_filter = cv2.medianBlur(hsv_filter, ksize)
 
-        # Sobel
-        # img = sobel_img(img)
-        # cv2.imshow('sobel', img)
+        cv2.imshow('img', img)
+        cv2.imshow('hsv', hsv)
+        cv2.imshow('hsv_filter', hsv_filter)
 
-        img = img.reshape(full_row * full_col)
-        img = normalize(img)
-        img = img.reshape(full_row, full_col)
+        # img = img.reshape(full_row * full_col)
+        # img = normalize(img)
+        # img = img.reshape(full_row, full_col)
+        img = hsv_filter
 
         img = block_reduce(img, block_size=(block_size, block_size), func=np.mean)
         img = img.flatten()
 
-        predict_label = np.array(model.predict(img.reshape([-1, row * col]))[0])
+        img = img.reshape([-1, row, col, 1])
+        # img = img.reshape([-1, row * col])
+        predict_label = np.array(model.predict(img)[0])
 
         max_pos = np.argmax(predict_label)
         max_value = predict_label[max_pos]
@@ -328,6 +342,85 @@ def draw_heatmap_with_realtime(model, num_square, row, col, block_size):
         predict_label = np.resize(predict_label, (square_width, square_width))
         for i, label_row in enumerate(predict_label):
             for j, val in enumerate(label_row):
+                pygame.draw.rect(screen,
+                                 (255 * val, 0, 255 * (1.0 - val)),
+                                 pygame.Rect(width * j, width * i, width * (j + 1),
+                                             width * (i + 1)))
+
+        k = cv2.waitKey(30)
+        pygame.display.flip()
+
+
+def draw_double_cross_heatmap(model_h, model_v, num_square, row, col, block_size):
+    board_size = 400
+    full_row = 200
+    full_col = 300
+    cap = cv2.VideoCapture(0)
+
+    normalize = lambda x: x / 255.0
+    normalize = np.vectorize(normalize)
+
+    pygame.init()
+    screen = pygame.display.set_mode((board_size, board_size))
+    done = False
+
+    # set up phase, press Q to continue
+    while True:
+        ret, img = cap.read()
+        img = cv2.resize(img, (300, 200))
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        hsv_filter = cv2.inRange(hsv, (MinH, MinS, MinV), (MaxH, MaxS, MaxV))
+        hsv_filter = cv2.dilate(hsv_filter, (5,5), iterations=5)
+        hsv_filter = cv2.medianBlur(hsv_filter, ksize)
+
+        cv2.imshow('img', img)
+        cv2.imshow('hsv', hsv)
+        cv2.imshow('hsv_filter', hsv_filter)
+
+        k = cv2.waitKey(30)
+        if k == ord('q'):
+            time.sleep(3)
+            break
+
+    while True:
+        ret, img = cap.read()
+        img = cv2.resize(img, (300, 200))
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        hsv_filter = cv2.inRange(hsv, (MinH, MinS, MinV), (MaxH, MaxS, MaxV))
+        hsv_filter = cv2.dilate(hsv_filter, (5, 5), iterations=5)
+        hsv_filter = cv2.medianBlur(hsv_filter, ksize)
+
+        cv2.imshow('img', cv2.flip(img, 1))
+        cv2.imshow('hsv', hsv)
+        cv2.imshow('hsv_filter', hsv_filter)
+        img = hsv_filter
+
+        img = block_reduce(img, block_size=(block_size, block_size), func=np.mean)
+        img = img.flatten()
+
+        img = img.reshape([-1, row, col, 1])
+        predict_label_h = np.array(model_h.predict(img)[0])
+        predict_label_v = np.array(model_v.predict(img)[0])
+
+        max_pos = np.argmax(predict_label_h)
+        max_value = predict_label_h[max_pos]
+        predict_label_h = predict_label_h / max_value
+        print 'Predicted H position %s' % max_pos
+
+        max_pos = np.argmax(predict_label_v)
+        max_value = predict_label_v[max_pos]
+        predict_label_v = predict_label_v / max_value
+        print 'Predicted V position %s' % max_pos
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                done = True
+
+        width = int(board_size/num_square)
+
+        for i, val_h in enumerate(predict_label_h):
+            for j, val_v in enumerate(predict_label_v):
+                val = (val_h + val_v) / 2.0
                 pygame.draw.rect(screen,
                                  (255 * val, 0, 255 * (1.0 - val)),
                                  pygame.Rect(width * j, width * i, width * (j + 1),
