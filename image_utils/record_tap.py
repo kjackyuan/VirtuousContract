@@ -15,11 +15,26 @@ caliber.calibrate_calibrator(cap)
 
 
 # recording configurations
-num_square = 12
-num_img = 500
+num_frame = 20
+num_region = 9
+num_position = 5
+num_iteration = 6
+
+region_fov = -1
+region_coordinate = {
+    0: (),
+    1: (),
+    2: (),
+    3: (),
+    4: (),
+    5: (),
+    6: (),
+    7: (),
+    8: ()
+}
 
 root_dir = 'image_data'
-main_dir = 'test_run'
+main_dir = 'double_tap'
 
 main_dir = os.path.join(root_dir, main_dir)
 
@@ -61,34 +76,36 @@ def record_and_filter():
     hsv_filter = cv2.dilate(hsv_filter, (5, 5), iterations=5)
     hsv_filter = cv2.medianBlur(hsv_filter, ksize)
     cv2.imshow('hsv_filter', hsv_filter)
-    k = cv2.waitKey(30)
+    k = cv2.waitKey(1)
 
     return hsv_filter, k
 
 
 # recording
-for pos in range(0, num_square):
-    sub_dir = os.path.join(main_dir, str(pos))
-    create_dir_if_dne(sub_dir)
+for region in range(0, num_region):
+    for pos in range(0, num_position):
+        for iter in range(0, num_iteration):
+            sub_dir = os.path.join(main_dir, '%s_%s_%s' % (region, pos, iter))
+            create_dir_if_dne(sub_dir)
 
-    print 'Previewing.... Position: %s' % pos
+            print '\n'
+            print 'Previewing... Region: %s, Position: %s, Iteration: %s' % (region, pos, iter)
+            print 'Press Q to Begin'
 
-    while True:
-        _, k = record_and_filter()
+            while True:
+                _, k = record_and_filter()
 
-        if k == ord('q'):
-            print 'Recording.... Position: %s' % pos
-            time.sleep(2)
-            break
-        elif k & 0xff == 27:
-            break
+                if k == ord('q'):
+                    break
+                elif k & 0xff == 27:
+                    break
 
-    for id in tqdm(range(num_img)):
-        hsv_filter, _ = record_and_filter()
+            for id in tqdm(range(num_frame)):
+                hsv_filter, _ = record_and_filter()
 
-        filename = os.path.join(sub_dir, '%s.png' % id)
-        with open(filename, 'wb') as f:
-            cv2.imwrite(filename, hsv_filter)
+                filename = os.path.join(sub_dir, '%s.png' % id)
+                with open(filename, 'wb') as f:
+                    cv2.imwrite(filename, hsv_filter)
 
 
 cap.release()

@@ -1,6 +1,12 @@
+import os
 import cv2
 import imutils
 import numpy as np
+
+
+def create_dir_if_dne(dir_name):
+    if not os.path.isdir(dir_name):
+        os.mkdir(dir_name)
 
 
 def get_hsv(window_name):
@@ -121,6 +127,9 @@ class Calibrator(object):
         cv2.createTrackbar('ksize', windowName_median_filter, 5, 100, lambda x: x)
 
         calibrated = False
+
+        print 'Caliberating: Press Q to calibrate. Press ESC to finish calibration'
+
         while True:
             img, hsv = standard_recording(cap_stream)
             MinH, MaxH, MinS, MaxS, MinV, MaxV = get_hsv(windowName_calibration)
