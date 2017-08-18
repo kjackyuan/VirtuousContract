@@ -16,10 +16,11 @@ caliber.calibrate_calibrator(cap)
 
 # recording configurations
 num_square = 12
-num_img = 500
+num_img = 700
 
 root_dir = 'image_data'
-main_dir = 'test_run'
+main_dir = 'double_cross_12_v'
+alt_dir = 'colored'
 
 main_dir = os.path.join(root_dir, main_dir)
 
@@ -63,18 +64,19 @@ def record_and_filter():
     cv2.imshow('hsv_filter', hsv_filter)
     k = cv2.waitKey(30)
 
-    return hsv_filter, k
+    return hsv_filter, img, k
 
 
 # recording
 for pos in range(0, num_square):
     sub_dir = os.path.join(main_dir, str(pos))
     create_dir_if_dne(sub_dir)
+    create_dir_if_dne(os.path.join(sub_dir, alt_dir))
 
-    print 'Previewing.... Position: %s' % pos
+    print 'Previewing.... Position: %s, Press Q to start' % pos
 
     while True:
-        _, k = record_and_filter()
+        _, _, k = record_and_filter()
 
         if k == ord('q'):
             print 'Recording.... Position: %s' % pos
@@ -84,11 +86,13 @@ for pos in range(0, num_square):
             break
 
     for id in tqdm(range(num_img)):
-        hsv_filter, _ = record_and_filter()
+        hsv_filter, img, _ = record_and_filter()
 
         filename = os.path.join(sub_dir, '%s.png' % id)
-        with open(filename, 'wb') as f:
-            cv2.imwrite(filename, hsv_filter)
+        cv2.imwrite(filename, hsv_filter)
+
+        alt_filename = os.path.join(sub_dir, alt_dir, '%s.png' % id)
+        cv2.imwrite(alt_filename, img)
 
 
 cap.release()

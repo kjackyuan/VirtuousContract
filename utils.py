@@ -14,6 +14,8 @@ import scipy.misc as smp
 from itertools import imap
 from skimage.measure import block_reduce
 
+from image_utils.img_utils import Calibrator
+
 
 def show_img(img, max_row, max_col):
     data = np.zeros((max_row, max_col, 3), dtype=np.uint8)
@@ -61,10 +63,11 @@ def _load_data(args):
 
     imgs = []
     labels = []
-    for root, dirs, files in os.walk('%s/%s' % (path, pos), topdown=False):
-        for name in files:
-            filepath = os.path.join(root, name)
 
+    root = '%s/%s' % (path, pos)
+    for name in os.listdir(root):
+        filepath = os.path.join(root, name)
+        if os.path.isfile(filepath):
             if name.endswith('.csv'):
                 img = load_img_to_nparray(filepath)
                 img = img.reshape(row, col)
@@ -74,7 +77,6 @@ def _load_data(args):
                 continue
 
             img = block_reduce(img, block_size=(block_size, block_size), func=np.mean)
-
             img = img.flatten()
 
             label = np.zeros(num_square)
@@ -86,7 +88,7 @@ def _load_data(args):
 
 
 class Dataset(object):
-    def __init__(self, path, num_square, row=200, col=300, block_size=6, cache_path=None):
+    def __init__(self, path, num_square, row=200, col=300, block_size=3, cache_path=None):
         self.num_square = num_square
         self.row = row
         self.col = col
@@ -353,22 +355,25 @@ def draw_heatmap_with_realtime(model, num_square, row, col, block_size):
 
 def draw_double_cross_heatmap(model_h, model_v, num_square, row, col, block_size):
     board_size = 400
-    full_row = 200
-    full_col = 300
     cap = cv2.VideoCapture(0)
 
-    normalize = lambda x: x / 255.0
-    normalize = np.vectorize(normalize)
+    # Calibration:
+    caliber = Calibrator()
+    caliber.calibrate_calibrator(cap)
 
     pygame.init()
     screen = pygame.display.set_mode((board_size, board_size))
-    done = False
 
     # set up phase, press Q to continue
+    print ('Set up Phase, Press Q to continue')
     while True:
         ret, img = cap.read()
         img = cv2.resize(img, (300, 200))
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+        img = caliber.transform_img(img)
+        hsv = caliber.transform_img(hsv)
+
         hsv_filter = cv2.inRange(hsv, (MinH, MinS, MinV), (MaxH, MaxS, MaxV))
         hsv_filter = cv2.dilate(hsv_filter, (5,5), iterations=5)
         hsv_filter = cv2.medianBlur(hsv_filter, ksize)
@@ -386,13 +391,17 @@ def draw_double_cross_heatmap(model_h, model_v, num_square, row, col, block_size
         ret, img = cap.read()
         img = cv2.resize(img, (300, 200))
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+        img = caliber.transform_img(img)
+        hsv = caliber.transform_img(hsv)
+
         hsv_filter = cv2.inRange(hsv, (MinH, MinS, MinV), (MaxH, MaxS, MaxV))
         hsv_filter = cv2.dilate(hsv_filter, (5, 5), iterations=5)
         hsv_filter = cv2.medianBlur(hsv_filter, ksize)
 
         cv2.imshow('img', cv2.flip(img, 1))
-        cv2.imshow('hsv', hsv)
-        cv2.imshow('hsv_filter', hsv_filter)
+        cv2.imshow('hsv', cv2.flip(hsv, 1))
+        cv2.imshow('hsv_filter', cv2.flip(hsv_filter, 1))
         img = hsv_filter
 
         img = block_reduce(img, block_size=(block_size, block_size), func=np.mean)
@@ -414,7 +423,7 @@ def draw_double_cross_heatmap(model_h, model_v, num_square, row, col, block_size
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                done = True
+                break
 
         width = int(board_size/num_square)
 
